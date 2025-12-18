@@ -1,49 +1,86 @@
-    import streamlit as st
+     import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
-import os
+from datetime import datetime
 import time
 
-# Page Config
-st.set_page_config(page_title="IEEE Digital Twin Research", layout="wide")
-st.title("🔬 Research Interface: Virtual Home Digital Twin")
+# 1. Page Setup for IEEE Publication Quality
+st.set_page_config(page_title="Digital Twin Co-Simulation", layout="wide")
+st.title("🔬 Cyber-Physical Systems: Virtual Home Digital Twin")
+st.markdown("---")
 
-# --- VIRTUAL MODEL VISUALIZER ---
-def draw_spatial_model(load):
-    # Logic: Green for low energy, Red for high energy
-    color = "#2ecc71" if load < 2.0 else "#e74c3c"
-    # Research-grade SVG Visualization
+# 2. THE VIRTUAL HOME ENGINE (Mathematical Model)
+# This simulates the "Physics" of your home without hardware
+def run_virtual_home_iteration():
+    now = datetime.now()
+    hour = now.hour
+    
+    # Stochastic Occupancy Model (Markov-like chain)
+    is_occupied = 1 if (7 <= hour <= 9 or 18 <= hour <= 23) else 0
+    
+    # Power Consumption Formula: P = P_base + P_active + Noise
+    base_load = 0.4  # standby power in kW
+    activity_spike = np.random.normal(1.5, 0.2) if is_occupied else 0.05
+    total_load = base_load + activity_spike + np.random.normal(0, 0.02)
+    
+    # Dynamic Pricing Model
+    price = round(1.2 + 0.6 * np.sin(hour * np.pi / 12), 2)
+    
+    return {
+        "datetime": now.strftime("%H:%M:%S"),
+        "Total Load": round(max(0, total_load), 3),
+        "Price": price,
+        "Occupancy": is_occupied
+    }
+
+# 3. SPATIAL VISUALIZATION (The "Virtual Home" Model)
+def draw_house_model(load, occupied):
+    # Color changes based on Load Intensity
+    color = "#2ecc71" if load < 1.0 else "#e67e22" if load < 2.0 else "#e74c3c"
+    window_color = "#f1c40f" if occupied else "#2c3e50"
+    
     svg = f"""
-    <svg width="300" height="200" viewBox="0 0 300 200">
-        <rect x="50" y="80" width="200" height="100" fill="{color}" stroke="white" stroke-width="2"/>
-        <path d="M50 80 L150 20 L250 80 Z" fill="#34495e" stroke="white" stroke-width="2"/>
-        <rect x="125" y="130" width="50" height="50" fill="#f1c40f"/>
-        <text x="80" y="195" fill="white" font-size="12">Spatial Load State: {load} kW</text>
+    <svg width="400" height="250" viewBox="0 0 400 250">
+        <path d="M50 100 L200 20 L350 100 Z" fill="#34495e" stroke="white" stroke-width="2"/>
+        <rect x="70" y="100" width="260" height="120" fill="{color}" stroke="white" stroke-width="3"/>
+        <rect x="110" y="130" width="40" height="40" fill="{window_color}" stroke="white"/>
+        <rect x="250" y="130" width="40" height="40" fill="{window_color}" stroke="white"/>
+        <text x="110" y="240" fill="white" font-weight="bold">Digital Twin Load: {load} kW</text>
     </svg>
     """
     st.markdown(svg, unsafe_allow_html=True)
 
-# --- DATA INGESTION ---
-# This looks for the latest data "transmitted" by your simulation
-if os.path.exists('data.csv'):
-    df = pd.read_csv('data.csv')
-    latest_data = df.iloc[-1]
-    
-    col1, col2 = st.columns([1, 2])
-    
-    with col1:
-        st.subheader("🏠 Virtual Spatial Model")
-        draw_spatial_model(latest_data['Total Load'])
-        st.write(f"**Transmission Status:** Active")
-        st.write(f"**Timestamp:** {latest_data['datetime']}")
+# 4. INITIALIZE DATA STREAM
+if 'history' not in st.session_state:
+    st.session_state.history = []
 
-    with col2:
-        st.subheader("📈 Real-Time Telemetry Stream")
-        fig = px.line(df.tail(50), x='datetime', y='Total Load', template="plotly_dark")
-        st.plotly_chart(fig, use_container_width=True)
-        
-    # Auto-refresh logic for the dashboard
-    time.sleep(2)
-    st.rerun()
-else:
-    st.error("Waiting for data transmission from Virtual Home Simulator...")
+# 5. LIVE EXECUTION LOOP
+# This generates a new "Virtual State" every time the page refreshes
+new_state = run_virtual_home_iteration()
+st.session_state.history.append(new_state)
+
+# Keep only last 50 data points for performance
+if len(st.session_state.history) > 50:
+    st.session_state.history.pop(0)
+
+# 6. DASHBOARD LAYOUT
+col1, col2 = st.columns([1, 2])
+
+with col1:
+    st.subheader("🏠 Spatial Virtual Model")
+    draw_house_model(new_state["Total Load"], new_state["Occupancy"])
+    st.metric("Real-Time Load", f"{new_state['Total Load']} kW", delta=f"{new_state['Price']} $/kWh")
+    st.write("**Simulation Status:** Transmitting...")
+
+with col2:
+    st.subheader("📊 Real-Time Telemetry Stream")
+    hist_df = pd.DataFrame(st.session_state.history)
+    fig = px.line(hist_df, x='datetime', y='Total Load', 
+                   title="Simulated IoT Data Stream (IEEE Standard)",
+                   template="plotly_dark")
+    st.plotly_chart(fig, use_container_width=True)
+
+# 7. AUTOMATED REFRESH (Simulates Live Data Flow)
+time.sleep(2)
+st.rerun()
