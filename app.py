@@ -1,4 +1,4 @@
-     import streamlit as st
+import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -84,3 +84,4 @@ with col2:
 # 7. AUTOMATED REFRESH (Simulates Live Data Flow)
 time.sleep(2)
 st.rerun()
+
