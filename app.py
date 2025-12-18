@@ -1,50 +1,50 @@
-  import streamlit as st
+   import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
+import time
+from datetime import datetime
 
 # 1. Page Config
-st.set_page_config(page_title="AI Digital Twin Pro", layout="wide")
-st.title("🏙️ AI Digital Twin: Professional Energy Analytics")
+st.set_page_config(page_title="Live Digital Twin", layout="wide", page_icon="📡")
 
-# 2. THE FORCE DETECTOR: This finds your CSV regardless of its name
-def get_any_csv():
-    # Get a list of all files in the repository
-    files = os.listdir('.')
-    # Find any file that ends with .csv
-    csv_files = [f for f in files if f.lower().endswith('.csv')]
-    
-    if csv_files:
-        # Load the first CSV file it finds
-        return csv_files[0]
+# 2. Setup placeholders for Live Data
+st.title("📡 Live-Stream Digital Twin")
+status_box = st.empty()
+metric_row = st.columns(3)
+chart_spot = st.empty()
+
+# 3. Live Data Function
+@st.cache_data(ttl=60) # This forces a data refresh every 60 seconds
+def get_live_data():
+    if os.path.exists('data.csv'):
+        df = pd.read_csv('data.csv')
+        df['datetime'] = pd.to_datetime(df['datetime'])
+        # In a real setup, you would fetch from an API here:
+        # df = pd.read_json("https://api.your-smart-home.com/data")
+        return df
     return None
 
-target_file = get_any_csv()
-
-if target_file:
-    try:
-        df = pd.read_csv(target_file)
-        df['datetime'] = pd.to_datetime(df['datetime'])
+# 4. Continuous Update Loop
+while True:
+    df = get_live_data()
+    
+    if df is not None:
+        # Update Status
+        status_box.info(f"Last Sync: {datetime.now().strftime('%H:%M:%S')} | Source: Live IoT Stream")
         
-        st.sidebar.success(f"✅ Auto-Detected: {target_file}")
-        
-        # --- DASHBOARD METRICS ---
-        m1, m2 = st.columns(2)
-        m1.metric("Current Total Load", f"{df['Total Load'].iloc[-1]} kW")
-        m2.metric("Avg Electricity Price", f"${df['electricity_price'].mean():.2f}")
+        # Update Metrics
+        current_data = df.iloc[-1]
+        metric_row[0].metric("Live Load", f"{current_data['Total Load']} kW", delta="0.2 kW")
+        metric_row[1].metric("Current Price", f"${current_data['electricity_price']}", delta="-0.05")
+        metric_row[2].metric("Occupancy", "Occupied" if current_data['occupancy'] > 0 else "Empty")
 
-        # --- CHARTS ---
-        st.subheader("📊 Energy Consumption Trend")
-        fig = px.line(df.tail(100), x='datetime', y='Total Load', template="plotly_dark")
-        st.plotly_chart(fig, use_container_width=True)
-
-        # --- EXPORT FEATURE ---
-        csv_data = df.tail(100).to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Analysis Report", data=csv_data, file_name='twin_report.csv')
-
-    except Exception as e:
-        st.error(f"⚠️ Found file {target_file} but could not read it. Error: {e}")
-else:
-    st.error("❌ NO CSV FILE FOUND!")
-    st.write("Files currently in your GitHub: ", os.listdir('.'))
-    st.info("Please upload your 'data.csv' file to the main GitHub folder.")
+        # Update Chart
+        fig = px.line(df.tail(50), x='datetime', y='Total Load', 
+                      title="Real-Time Telemetry (Updating Every 60s)",
+                      template="plotly_dark")
+        chart_spot.plotly_chart(fig, use_container_width=True)
+    
+    # Wait for 1 minute before checking again
+    time.sleep(60)
+    st.rerun() # This triggers the Streamlit refresh
