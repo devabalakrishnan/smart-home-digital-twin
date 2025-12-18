@@ -1,24 +1,39 @@
-import streamlit as st
+ import streamlit as st
 import pandas as pd
 import os
 
-st.set_page_config(page_title="Digital Twin Dashboard", layout="wide")
+# Set page title
+st.set_page_config(page_title="Home Energy Digital Twin", layout="wide")
+
 st.title("🏠 Smart Home Digital Twin")
 
 # The name must match exactly what you have on GitHub
-FILENAME = 'data.csv' 
+filename = 'data.csv'
 
-if os.path.exists(FILENAME):
-    df = pd.read_csv(FILENAME)
-    st.success(f"✅ Successfully loaded {FILENAME}")
+if os.path.exists(filename):
+    # Load the data
+    df = pd.read_csv(filename)
+    df['datetime'] = pd.to_datetime(df['datetime'])
     
-    # Simple Visualization
-    st.subheader("Energy Usage Overview")
-    st.line_chart(df[['Total Load']].tail(100))
+    # Success Message
+    st.sidebar.success(f"✅ Connected to {filename}")
     
-    if st.checkbox("Show Raw Data"):
-        st.dataframe(df.head(20))
+    # Simple Metrics
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Data Points", len(df))
+    col2.metric("Avg Electricity Price", f"${df['electricity_price'].mean():.2f}")
+    col3.metric("Peak Load", f"{df['Total Load'].max()} kW")
+
+    # Chart
+    st.subheader("Live Energy Load (kW)")
+    st.line_chart(df.set_index('datetime')['Total Load'].tail(100))
+    
+    # Show Table
+    if st.checkbox("Show Raw Data Logs"):
+        st.write(df.head(20))
 else:
-    st.error(f"❌ Cannot find '{FILENAME}'")
-    st.write("Files currently in your GitHub repository:")
+    # Error Message if file is missing
+    st.error(f"❌ Still can't find '{filename}'")
+    st.write("Current files in your GitHub repository:")
     st.write(os.listdir("."))
+    st.info("Check if the file is named 'data.csv' (all lowercase) on GitHub.")
