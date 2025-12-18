@@ -1,50 +1,49 @@
-   import streamlit as st
+    import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
 import time
-from datetime import datetime
 
-# 1. Page Config
-st.set_page_config(page_title="Live Digital Twin", layout="wide", page_icon="📡")
+# Page Config
+st.set_page_config(page_title="IEEE Digital Twin Research", layout="wide")
+st.title("🔬 Research Interface: Virtual Home Digital Twin")
 
-# 2. Setup placeholders for Live Data
-st.title("📡 Live-Stream Digital Twin")
-status_box = st.empty()
-metric_row = st.columns(3)
-chart_spot = st.empty()
+# --- VIRTUAL MODEL VISUALIZER ---
+def draw_spatial_model(load):
+    # Logic: Green for low energy, Red for high energy
+    color = "#2ecc71" if load < 2.0 else "#e74c3c"
+    # Research-grade SVG Visualization
+    svg = f"""
+    <svg width="300" height="200" viewBox="0 0 300 200">
+        <rect x="50" y="80" width="200" height="100" fill="{color}" stroke="white" stroke-width="2"/>
+        <path d="M50 80 L150 20 L250 80 Z" fill="#34495e" stroke="white" stroke-width="2"/>
+        <rect x="125" y="130" width="50" height="50" fill="#f1c40f"/>
+        <text x="80" y="195" fill="white" font-size="12">Spatial Load State: {load} kW</text>
+    </svg>
+    """
+    st.markdown(svg, unsafe_allow_html=True)
 
-# 3. Live Data Function
-@st.cache_data(ttl=60) # This forces a data refresh every 60 seconds
-def get_live_data():
-    if os.path.exists('data.csv'):
-        df = pd.read_csv('data.csv')
-        df['datetime'] = pd.to_datetime(df['datetime'])
-        # In a real setup, you would fetch from an API here:
-        # df = pd.read_json("https://api.your-smart-home.com/data")
-        return df
-    return None
-
-# 4. Continuous Update Loop
-while True:
-    df = get_live_data()
+# --- DATA INGESTION ---
+# This looks for the latest data "transmitted" by your simulation
+if os.path.exists('data.csv'):
+    df = pd.read_csv('data.csv')
+    latest_data = df.iloc[-1]
     
-    if df is not None:
-        # Update Status
-        status_box.info(f"Last Sync: {datetime.now().strftime('%H:%M:%S')} | Source: Live IoT Stream")
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.subheader("🏠 Virtual Spatial Model")
+        draw_spatial_model(latest_data['Total Load'])
+        st.write(f"**Transmission Status:** Active")
+        st.write(f"**Timestamp:** {latest_data['datetime']}")
+
+    with col2:
+        st.subheader("📈 Real-Time Telemetry Stream")
+        fig = px.line(df.tail(50), x='datetime', y='Total Load', template="plotly_dark")
+        st.plotly_chart(fig, use_container_width=True)
         
-        # Update Metrics
-        current_data = df.iloc[-1]
-        metric_row[0].metric("Live Load", f"{current_data['Total Load']} kW", delta="0.2 kW")
-        metric_row[1].metric("Current Price", f"${current_data['electricity_price']}", delta="-0.05")
-        metric_row[2].metric("Occupancy", "Occupied" if current_data['occupancy'] > 0 else "Empty")
-
-        # Update Chart
-        fig = px.line(df.tail(50), x='datetime', y='Total Load', 
-                      title="Real-Time Telemetry (Updating Every 60s)",
-                      template="plotly_dark")
-        chart_spot.plotly_chart(fig, use_container_width=True)
-    
-    # Wait for 1 minute before checking again
-    time.sleep(60)
-    st.rerun() # This triggers the Streamlit refresh
+    # Auto-refresh logic for the dashboard
+    time.sleep(2)
+    st.rerun()
+else:
+    st.error("Waiting for data transmission from Virtual Home Simulator...")
