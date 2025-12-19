@@ -80,8 +80,47 @@ with col2:
                    title="Simulated IoT Data Stream (IEEE Standard)",
                    template="plotly_dark")
     st.plotly_chart(fig, use_container_width=True)
+    # --- Add this to your Sidebar ---
+st.sidebar.header("🕹️ Simulation Controls")
+fault_trigger = st.sidebar.button("🚨 Simulate Appliance Fault")
+
+# --- Update your Virtual Home Engine function ---
+def run_virtual_home(is_fault):
+    now = datetime.now()
+    hour = now.hour
+    
+    # Normal Logic
+    is_occupied = 1 if (7 <= hour <= 9 or 18 <= hour <= 23) else 0
+    base_load = 0.4 
+    
+    # If button is pressed, force a massive spike (Fault Injection)
+    if is_fault:
+        activity = 5.5  # Simulate a short circuit or heavy motor fault
+        status = "FAULT DETECTED"
+    else:
+        activity = np.random.normal(1.5, 0.2) if is_occupied else 0.05
+        status = "Operating Normally"
+        
+    total_load = base_load + activity + np.random.normal(0, 0.02)
+    price = round(1.2 + 0.6 * np.sin(hour * np.pi / 12), 2)
+    
+    return {
+        "time": now.strftime("%H:%M:%S"), 
+        "load": round(total_load, 3), 
+        "price": price, 
+        "occ": is_occupied,
+        "status": status
+    }
+
+# --- Call the function with the trigger ---
+current_state = run_virtual_home(fault_trigger)
+
+# --- Display the Status in your UI ---
+if fault_trigger:
+    st.error(f"CRITICAL SYSTEM ALERT: {current_state['status']}")
 
 # 7. AUTOMATED REFRESH (Simulates Live Data Flow)
 time.sleep(2)
 st.rerun()
+
 
